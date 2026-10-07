@@ -2,15 +2,19 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace ShinonoDNSUnlocker
 {
     public partial class MainWindow : Window
     {
         private bool isVietnamese = true;
+        private DispatcherTimer pingTimer;
+        private static readonly HttpClient httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
 
         public MainWindow()
         {
@@ -22,7 +26,15 @@ namespace ShinonoDNSUnlocker
             Log("Khởi động ShinonoDNSUnlocker (SDU) thành công...");
             UpdateLanguage();
             LoadNetworkAdapters();
+
+            // Chạy Ping ngay lập tức
             await PingDNSAsync();
+
+            // Setup bộ hẹn giờ Ping mỗi 5 giây
+            pingTimer = new DispatcherTimer();
+            pingTimer.Interval = TimeSpan.FromSeconds(5);
+            pingTimer.Tick += async (s, args) => await PingDNSAsync();
+            pingTimer.Start();
         }
 
         #region --- NGÔN NGỮ (LANGUAGE) ---
@@ -33,54 +45,57 @@ namespace ShinonoDNSUnlocker
         {
             lblAdapter.Text = isVietnamese ? "Chọn Card Mạng:" : "Select Adapter:";
             btnRefreshAdapters.Content = isVietnamese ? "Làm mới" : "Refresh";
-            btnSetCF.Content = isVietnamese ? "1. Đổi DNS (Khuyên dùng)" : "1. Set DNS (Recommended)";
-            btnSetCFDoH.Content = isVietnamese ? "2. DNS + DoH (Mạnh hơn)" : "2. DNS + DoH (Stronger)";
+
+            btnSetCF.Content = isVietnamese ? "1. Đổi DNS" : "1. Set DNS";
+            btnSetCFDoH.Content = isVietnamese ? "2. Đổi DNS + DoH (Mạnh)" : "2. Set DNS + DoH (Strong)";
             btnSetGG.Content = btnSetCF.Content;
             btnSetGGDoH.Content = btnSetCFDoH.Content;
-            btnSetCustom.Content = isVietnamese ? "Áp dụng Custom DNS" : "Apply Custom DNS";
-            lblHostsDesc.Text = isVietnamese ? "Dùng khi đổi DNS không hiệu quả. Ghi cứng IP Steam vào file hệ thống." : "Use when DNS fails. Hardcode Steam IP into system hosts file.";
-            btnApplyHosts.Content = isVietnamese ? "Áp dụng Hosts Bypass" : "Apply Hosts Bypass";
-            btnRemoveHosts.Content = isVietnamese ? "Xóa Hosts Bypass" : "Remove Hosts Bypass";
+
+            lblHostsDesc.Text = isVietnamese ? "Dùng khi DNS/DoH không hoạt động. Ghi IP trực tiếp vào hệ thống." : "Use when DNS fails. Hardcode Steam IP into system directly.";
+            btnApplyHosts.Content = isVietnamese ? "ÁP DỤNG BYPASS" : "APPLY BYPASS";
+            btnRemoveHosts.Content = isVietnamese ? "XÓA BYPASS" : "REMOVE BYPASS";
+
             btnRestore.Content = isVietnamese ? "Khôi phục Mặc định (DHCP)" : "Restore Default (DHCP)";
             btnTestSteam.Content = isVietnamese ? "Kiểm tra Kết nối Steam" : "Test Steam Connection";
             Log(isVietnamese ? "Đã đổi ngôn ngữ sang Tiếng Việt." : "Language changed to English.");
         }
         #endregion
 
-        #region --- TÍNH NĂNG MẠNG & PING ---
+        #region --- TÍNH NĂNG MẠNG & PING (Auto 5s) ---
         private void LoadNetworkAdapters()
         {
             cmbAdapters.Items.Clear();
             var nics = NetworkInterface.GetAllNetworkInterfaces()
                 .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback);
 
-            foreach (var nic in nics)
-            {
-                cmbAdapters.Items.Add(nic.Name);
-            }
+            foreach (var nic in nics) cmbAdapters.Items.Add(nic.Name);
             if (cmbAdapters.Items.Count > 0) cmbAdapters.SelectedIndex = 0;
-            Log(isVietnamese ? "Đã tải danh sách Card mạng." : "Loaded network adapters.");
+            Log(isVietnamese ? "Đã cập nhật danh sách Card mạng." : "Updated network adapters.");
         }
 
         private void BtnRefreshAdapters_Click(object sender, RoutedEventArgs e) => LoadNetworkAdapters();
 
         private async Task PingDNSAsync()
         {
-            lblPingCF.Text = await GetPingResult("1.1.1.1", "Cloudflare");
-            lblPingGG.Text = await GetPingResult("8.8.8.8", "Google");
+            // Không log ra Console để tránh rác màn hình
+            string cfPing = await GetPingResult("1.1.1.1");
+            string ggPing = await GetPingResult("8.8.8.8");
+
+            lblPingCF.Text = $"Ping: {cfPing}";
+            lblPingGG.Text = $"Ping: {ggPing}";
         }
 
-        private async Task<string> GetPingResult(string ip, string name)
+        private async Task<string> GetPingResult(string ip)
         {
             try
             {
-                Ping pingSender = new Ping();
-                PingReply reply = await pingSender.SendPingAsync(ip, 2000);
-                if (reply.Status == IPStatus.Success)
-                    return $"Ping {name}: {reply.RoundtripTime} ms";
-                return $"Ping {name}: Timeout";
+                using (Ping pingSender = new Ping())
+                {
+                    PingReply reply = await pingSender.SendPingAsync(ip, 2000);
+                    return reply.Status == IPStatus.Success ? $"{reply.RoundtripTime} ms" : "Timeout";
+                }
             }
-            catch { return $"Ping {name}: Error"; }
+            catch { return "Error"; }
         }
         #endregion
 
@@ -120,14 +135,11 @@ namespace ShinonoDNSUnlocker
                     else
                     {
                         string error = process.StandardError.ReadToEnd();
-                        Log("ERROR: " + error);
+                        Log("LỖI (ERROR): " + error);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Log("Exception: " + ex.Message);
-            }
+            catch (Exception ex) { Log("Lỗi hệ thống: " + ex.Message); }
         }
 
         private void FlushDNS()
@@ -190,14 +202,6 @@ namespace ShinonoDNSUnlocker
             EnableDoH("8.8.8.8", "8.8.4.4", "https://dns.google/dns-query");
         }
 
-        private void BtnSetCustom_Click(object sender, RoutedEventArgs e)
-        {
-            string dns1 = txtCustomDNS1.Text.Trim();
-            string dns2 = txtCustomDNS2.Text.Trim();
-            if (string.IsNullOrEmpty(dns1)) { MessageBox.Show("Nhập ít nhất 1 IP"); return; }
-            SetDNS(dns1, string.IsNullOrEmpty(dns2) ? "1.1.1.1" : dns2, "::1", "::1"); // IPv6 stub
-        }
-
         private void BtnRestore_Click(object sender, RoutedEventArgs e)
         {
             string adapter = GetSelectedAdapter();
@@ -215,7 +219,6 @@ namespace ShinonoDNSUnlocker
         private readonly string bypassMarker = "# SDU_STEAM_BYPASS_START";
         private readonly string bypassEndMarker = "# SDU_STEAM_BYPASS_END";
 
-        // IP tĩnh của Akamai/Steam. (Cập nhật được nếu Steam đổi IP)
         private readonly string steamHostsData = @"
 104.18.32.115 store.steampowered.com
 104.18.32.115 steamcommunity.com
@@ -229,45 +232,69 @@ namespace ShinonoDNSUnlocker
                 BtnRemoveHosts_Click(null, null); // Clear old first
                 File.AppendAllText(hostsPath, $"\n{bypassMarker}\n{steamHostsData.Trim()}\n{bypassEndMarker}\n");
                 FlushDNS();
-                Log(isVietnamese ? "Đã áp dụng Hosts Bypass thành công!" : "Hosts Bypass applied successfully!");
+                Log(isVietnamese ? "Đã áp dụng Hosts Bypass thành công! IP Steam đã được lưu cứng." : "Hosts Bypass applied successfully!");
             }
-            catch (Exception ex) { Log("Lỗi ghi file Hosts (Chưa có quyền Admin?): " + ex.Message); }
+            catch (Exception ex) { Log("Lỗi ghi file Hosts: " + ex.Message); }
         }
 
         private void BtnRemoveHosts_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                if (!File.Exists(hostsPath)) return;
                 string[] lines = File.ReadAllLines(hostsPath);
-                var newLines = lines.SkipWhile(l => l.Contains(bypassMarker))
-                                    .TakeWhile(l => !l.Contains(bypassEndMarker))
-                                    .ToList(); // Logic simplified for safety: remove block
-
                 string resultText = "";
                 bool inBlock = false;
+
                 foreach (var line in lines)
                 {
                     if (line.Contains(bypassMarker)) { inBlock = true; continue; }
                     if (line.Contains(bypassEndMarker)) { inBlock = false; continue; }
-                    if (!inBlock) resultText += line + "\n";
+                    if (!inBlock && !string.IsNullOrWhiteSpace(line)) resultText += line + "\n";
                 }
 
-                File.WriteAllText(hostsPath, resultText.TrimEnd() + "\n");
-                if (sender != null) Log(isVietnamese ? "Đã xóa Steam Hosts Bypass." : "Removed Steam Hosts Bypass.");
+                File.WriteAllText(hostsPath, resultText);
+                if (sender != null) Log(isVietnamese ? "Đã xóa Steam Hosts Bypass khỏi hệ thống." : "Removed Steam Hosts Bypass.");
             }
             catch (Exception ex) { Log("Lỗi xóa file Hosts: " + ex.Message); }
         }
         #endregion
 
-        #region --- STEAM CONNECTION TEST ---
-        private void BtnTestSteam_Click(object sender, RoutedEventArgs e)
+        #region --- NATIVE STEAM CONNECTION TEST (C# HttpClient) ---
+        private async void BtnTestSteam_Click(object sender, RoutedEventArgs e)
         {
-            Log(isVietnamese ? "Đang chạy bài Test. Vui lòng đợi..." : "Running tests. Please wait...");
-            string script = @"
-                try{$r=Invoke-WebRequest 'https://store.steampowered.com/' -UseBasicParsing -TimeoutSec 5; Write-Output ('Store: HTTP '+$r.StatusCode)}catch{Write-Output ('Store: '+$_.Exception.Message)};
-                try{$r=Invoke-WebRequest 'https://steamcommunity.com/' -UseBasicParsing -TimeoutSec 5; Write-Output ('Community: HTTP '+$r.StatusCode)}catch{Write-Output ('Community: '+$_.Exception.Message)}
-            ";
-            RunPowerShell(script, isVietnamese ? "Hoàn thành kiểm tra (Xem log phía trên)" : "Test finished (See log above)");
+            btnTestSteam.IsEnabled = false;
+            Log(isVietnamese ? "Đang kiểm tra kết nối tới máy chủ Steam..." : "Testing connection to Steam servers...");
+
+            await TestUrlAsync("https://store.steampowered.com/", "Steam Store");
+            await TestUrlAsync("https://steamcommunity.com/", "Steam Community");
+
+            Log(isVietnamese ? "Hoàn tất kiểm tra." : "Test finished.");
+            btnTestSteam.IsEnabled = true;
+        }
+
+        private async Task TestUrlAsync(string url, string name)
+        {
+            try
+            {
+                HttpResponseMessage response = await httpClient.GetAsync(url);
+                if (response.IsSuccessStatusCode)
+                {
+                    Log($"[PASS] {name} -> Truy cập THÀNH CÔNG (HTTP {(int)response.StatusCode})");
+                }
+                else
+                {
+                    Log($"[WARNING] {name} -> Kết nối được nhưng trả về lỗi: {(int)response.StatusCode}");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                Log($"[FAIL] {name} -> BỊ CHẶN HOẶC LỖI MẠNG! ({ex.Message})");
+            }
+            catch (TaskCanceledException)
+            {
+                Log($"[FAIL] {name} -> HẾT THỜI GIAN CHỜ (Timeout)! Nhà mạng có thể đang chặn.");
+            }
         }
         #endregion
     }
