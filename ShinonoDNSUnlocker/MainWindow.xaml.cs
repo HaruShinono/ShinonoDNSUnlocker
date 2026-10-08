@@ -95,15 +95,21 @@ namespace ShinonoDNSUnlocker
             theme.SetBaseTheme(isDarkMode ? BaseTheme.Dark : BaseTheme.Light);
             paletteHelper.SetTheme(theme);
 
-            // FIX LỖI NGƯỢC MÀU: Ép cứng màu nền (Background) và màu chữ (Foreground) của toàn bộ Cửa sổ
             this.Background = isDarkMode ? new SolidColorBrush(Color.FromRgb(30, 30, 30)) : Brushes.WhiteSmoke;
             this.Foreground = isDarkMode ? Brushes.White : Brushes.Black;
 
+            if (HeaderIcon != null && HeaderText != null)
+            {
+                HeaderIcon.Foreground = isDarkMode ? Brushes.White : Brushes.Black;
+                HeaderText.Foreground = isDarkMode ? Brushes.White : Brushes.Black;
+            }
+
+            // Đổi màu chữ của hộp Log
             if (txtLog != null)
             {
                 txtLog.Foreground = isDarkMode
-                    ? new SolidColorBrush(Color.FromRgb(74, 246, 38))   // Neon Green cho nền tối
-                    : new SolidColorBrush(Color.FromRgb(0, 100, 0));    // Green đậm cho nền sáng
+                    ? new SolidColorBrush(Color.FromRgb(74, 246, 38))  
+                    : new SolidColorBrush(Color.FromRgb(0, 100, 0));    
             }
         }
         #endregion
@@ -376,7 +382,7 @@ namespace ShinonoDNSUnlocker
                     Log($"[WARNING] {name} -> Kết nối được nhưng trả về lỗi: {(int)response.StatusCode}");
             }
             catch (HttpRequestException ex) { Log($"[FAIL] {name} -> BỊ CHẶN HOẶC LỖI MẠNG! ({ex.Message})"); }
-            catch (TaskCanceledException) { Log($"[FAIL] {name} -> HẾT THỜI GIAN CHỜ (Timeout)! Nhà mạng đang chặn."); }
+            catch (TaskCanceledException) { Log($"[FAIL] {name} -> HẾT THỜI GIAN CHỜ (Timeout)!"); }
         }
         #endregion
     }

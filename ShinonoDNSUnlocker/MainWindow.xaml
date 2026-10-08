@@ -25,11 +25,11 @@
         <!-- Header -->
         <Grid Grid.Row="0" Margin="0,0,0,15">
             <StackPanel Orientation="Horizontal">
-                <materialDesign:PackIcon Kind="ShieldCheckOutline" Width="36" Height="36" Foreground="{DynamicResource PrimaryHueLightBrush}" Margin="0,0,10,0"/>
-                <TextBlock Text="SHINONO DNS UNLOCKER" FontSize="26" FontWeight="ExtraBold" Foreground="{DynamicResource PrimaryHueLightBrush}" VerticalAlignment="Center"/>
+                <materialDesign:PackIcon x:Name="HeaderIcon" Kind="ShieldCheckOutline" Width="36" Height="36" Margin="0,0,10,0"/>
+                <TextBlock x:Name="HeaderText" Text="SHINONO DNS UNLOCKER" FontSize="26" FontWeight="ExtraBold" VerticalAlignment="Center"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="btnThemeToggle" Click="BtnThemeToggle_Click" Style="{StaticResource MaterialDesignIconForegroundButton}" ToolTip="Đổi Giao diện Sáng/Tối // Change Light/Dark Theme" Margin="0,0,15,0">
+                <Button x:Name="btnThemeToggle" Click="BtnThemeToggle_Click" Style="{StaticResource MaterialDesignIconForegroundButton}" ToolTip="Đổi Giao diện Sáng/Tối" Margin="0,0,15,0">
                     <materialDesign:PackIcon Kind="ThemeLightDark" Width="24" Height="24"/>
                 </Button>
                 <TextBlock x:Name="txtLanguage" Text="Language:" VerticalAlignment="Center" Margin="0,0,10,0"/>
