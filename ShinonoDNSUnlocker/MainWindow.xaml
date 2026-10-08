@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="ShinonoDNSUnlocker (SDU) - Steam Unlocker" 
-        Height="680" Width="820" ResizeMode="CanMinimize"
+        Height="730" Width="820" ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen" FontFamily="Segoe UI"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         Background="{DynamicResource MaterialDesignPaper}" Loaded="Window_Loaded">
@@ -11,10 +11,15 @@
     <Grid Margin="20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <!-- Header -->
             <RowDefinition Height="Auto"/>
+            <!-- Network -->
             <RowDefinition Height="Auto"/>
+            <!-- Cards -->
             <RowDefinition Height="Auto"/>
+            <!-- Utilities -->
             <RowDefinition Height="*"/>
+            <!-- Log Box -->
         </Grid.RowDefinitions>
 
         <!-- Header -->
@@ -24,6 +29,9 @@
                 <TextBlock Text="SHINONO DNS UNLOCKER" FontSize="26" FontWeight="ExtraBold" Foreground="{DynamicResource PrimaryHueLightBrush}" VerticalAlignment="Center"/>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="btnThemeToggle" Click="BtnThemeToggle_Click" Style="{StaticResource MaterialDesignIconForegroundButton}" ToolTip="Đổi Giao diện Sáng/Tối" Margin="0,0,15,0">
+                    <materialDesign:PackIcon Kind="ThemeLightDark" Width="24" Height="24"/>
+                </Button>
                 <TextBlock x:Name="txtLanguage" Text="Language:" VerticalAlignment="Center" Margin="0,0,10,0"/>
                 <Button Content="VN" x:Name="btnLangVN" Click="BtnLangVN_Click" Margin="0,0,5,0" Style="{StaticResource MaterialDesignOutlinedButton}" Height="30" Padding="10,0"/>
                 <Button Content="EN" x:Name="btnLangEN" Click="BtnLangEN_Click" Style="{StaticResource MaterialDesignOutlinedButton}" Height="30" Padding="10,0"/>
@@ -38,7 +46,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="lblAdapter" Text="Chọn Card Mạng:" VerticalAlignment="Center" FontWeight="SemiBold" Margin="0,0,15,0"/>
-            <ComboBox x:Name="cmbAdapters" Grid.Column="1" materialDesign:HintAssist.Hint="Đang tìm các kết nối mạng..." Style="{StaticResource MaterialDesignOutlinedComboBox}" Margin="0,0,15,0"/>
+            <ComboBox x:Name="cmbAdapters" Grid.Column="1" materialDesign:HintAssist.Hint="Đang tìm các kết nối mạng..." Style="{StaticResource MaterialDesignOutlinedComboBox}" Margin="0,0,15,0" SelectionChanged="CmbAdapters_SelectionChanged"/>
             <Button x:Name="btnRefreshAdapters" Content="Refresh" Grid.Column="2" Click="BtnRefreshAdapters_Click" Style="{StaticResource MaterialDesignFlatButton}"/>
         </Grid>
 
@@ -54,33 +62,33 @@
             </Grid.RowDefinitions>
 
             <!-- Card Cloudflare -->
-            <materialDesign:Card Grid.Row="0" Grid.Column="0" Margin="5" Padding="15" Background="#1E1E1E">
+            <materialDesign:Card Grid.Row="0" Grid.Column="0" Margin="5" Padding="15" Background="{DynamicResource MaterialDesignCardBackground}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                         <materialDesign:PackIcon Kind="CloudOutline" Width="24" Height="24" Foreground="#FF9900" Margin="0,0,8,0"/>
                         <TextBlock Text="CLOUDFLARE" FontSize="18" FontWeight="Bold" Foreground="#FF9900" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock x:Name="lblPingCF" Text="Ping: Đang đo..." Foreground="#AAAAAA" Margin="0,0,0,15" FontWeight="SemiBold"/>
-                    <Button x:Name="btnSetCF" Content="1. Set DNS" Click="BtnSetCF_Click" Margin="0,0,0,10" Background="#FF9900" BorderBrush="#FF9900" Foreground="Black" FontWeight="Bold"/>
+                    <TextBlock x:Name="lblPingCF" Text="Ping: Đang đo..." Margin="0,0,0,15" FontWeight="SemiBold"/>
+                    <Button x:Name="btnSetCF" Content="1. Set DNS" Click="BtnSetCF_Click" Margin="0,0,0,10" Background="#FF9900" BorderBrush="#FF9900" Foreground="White" FontWeight="Bold"/>
                     <Button x:Name="btnSetCFDoH" Content="2. Set DNS + DoH (Mạnh)" Click="BtnSetCFDoH_Click" Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="#FF9900" Foreground="#FF9900"/>
                 </StackPanel>
             </materialDesign:Card>
 
             <!-- Card Google -->
-            <materialDesign:Card Grid.Row="0" Grid.Column="1" Margin="5" Padding="15" Background="#1E1E1E">
+            <materialDesign:Card Grid.Row="0" Grid.Column="1" Margin="5" Padding="15" Background="{DynamicResource MaterialDesignCardBackground}">
                 <StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,5">
                         <materialDesign:PackIcon Kind="Google" Width="24" Height="24" Foreground="#4285F4" Margin="0,0,8,0"/>
                         <TextBlock Text="GOOGLE DNS" FontSize="18" FontWeight="Bold" Foreground="#4285F4" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock x:Name="lblPingGG" Text="Ping: Đang đo..." Foreground="#AAAAAA" Margin="0,0,0,15" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="lblPingGG" Text="Ping: Đang đo..." Margin="0,0,0,15" FontWeight="SemiBold"/>
                     <Button x:Name="btnSetGG" Content="1. Set DNS" Click="BtnSetGG_Click" Margin="0,0,0,10" Background="#4285F4" BorderBrush="#4285F4" Foreground="White" FontWeight="Bold"/>
                     <Button x:Name="btnSetGGDoH" Content="2. Set DNS + DoH (Mạnh)" Click="BtnSetGGDoH_Click" Style="{StaticResource MaterialDesignOutlinedButton}" BorderBrush="#4285F4" Foreground="#4285F4"/>
                 </StackPanel>
             </materialDesign:Card>
 
-            <!-- Card Steam Hosts Bypass (Centered below) -->
-            <materialDesign:Card Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,10,5,5" Padding="15" Background="#1A1212" BorderBrush="#FF3B30" BorderThickness="1">
+            <!-- Card Steam Hosts Bypass -->
+            <materialDesign:Card Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="5,10,5,5" Padding="15" BorderBrush="#FF3B30" BorderThickness="1.5" Background="{DynamicResource MaterialDesignCardBackground}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -91,7 +99,7 @@
                             <materialDesign:PackIcon Kind="Steam" Width="28" Height="28" Foreground="#FF3B30" Margin="0,0,8,0"/>
                             <TextBlock Text="STEAM HOSTS BYPASS" FontSize="20" FontWeight="Black" Foreground="#FF3B30" VerticalAlignment="Center"/>
                         </StackPanel>
-                        <TextBlock x:Name="lblHostsDesc" Text="Dùng khi DNS/DoH không hoạt động. Ghi IP trực tiếp vào hệ thống." Foreground="#CCCCCC" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="lblHostsDesc" Text="Dùng khi DNS/DoH không hoạt động. Ghi IP trực tiếp vào hệ thống." TextWrapping="Wrap"/>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button x:Name="btnApplyHosts" Content="ÁP DỤNG BYPASS" Background="#FF3B30" BorderBrush="#FF3B30" Foreground="White" FontWeight="Bold" Click="BtnApplyHosts_Click" Margin="0,0,10,0"/>
@@ -101,20 +109,20 @@
             </materialDesign:Card>
         </Grid>
 
-        <!-- Utility Controls -->
-        <Grid Grid.Row="3" Margin="0,5,0,15">
+        <!-- Utility Controls (Căn đều và làm nổi bật nút Gỡ) -->
+        <Grid Grid.Row="3" Margin="5,0,5,15">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1.2*"/>
                 <ColumnDefinition Width="1*"/>
             </Grid.ColumnDefinitions>
-            <Button x:Name="btnRestore" Content="Khôi phục Mặc định (DHCP)" Click="BtnRestore_Click" Margin="5" Style="{StaticResource MaterialDesignPaperSecondaryButton}"/>
-            <Button x:Name="btnTestSteam" Content="Kiểm tra Kết nối Steam" Click="BtnTestSteam_Click" Margin="5" Background="#2E7D32" BorderBrush="#2E7D32" Foreground="White"/>
+            <Button x:Name="btnRestore" Content="XÓA CÀI ĐẶT: Trả về Tự Động (Auto)" Click="BtnRestore_Click" Background="#424242" BorderBrush="#424242" Foreground="White" Height="40" Margin="0,0,10,0" ToolTip="Gỡ bỏ toàn bộ cấu hình DNS và DoH, đưa mạng về lại chế độ Auto mặc định"/>
+            <Button x:Name="btnTestSteam" Content="Kiểm tra Kết nối Steam" Click="BtnTestSteam_Click" Grid.Column="1" Background="#2E7D32" BorderBrush="#2E7D32" Foreground="White" Height="40"/>
         </Grid>
 
-        <!-- Log Terminal -->
-        <GroupBox Grid.Row="4" Header="Console Logs" materialDesign:ColorZoneAssist.Mode="Dark">
-            <ScrollViewer x:Name="LogScroll">
-                <TextBlock x:Name="txtLog" FontFamily="Consolas" FontSize="13" Foreground="#4AF626" TextWrapping="Wrap"/>
+        <!-- Log Terminal (Đã cố định Height để không bao giờ bị đè) -->
+        <GroupBox Grid.Row="4" Header="Console Logs">
+            <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto" Height="150">
+                <TextBlock x:Name="txtLog" FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" Margin="5"/>
             </ScrollViewer>
         </GroupBox>
     </Grid>

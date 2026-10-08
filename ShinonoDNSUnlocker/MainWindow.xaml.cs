@@ -1,3 +1,4 @@
+using MaterialDesignThemes.Wpf;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -6,6 +7,7 @@ using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace ShinonoDNSUnlocker
@@ -13,12 +15,14 @@ namespace ShinonoDNSUnlocker
     public partial class MainWindow : Window
     {
         private bool isVietnamese = true;
+        private bool isDarkMode = true;
         private DispatcherTimer pingTimer;
         private static readonly HttpClient httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
 
         public MainWindow()
         {
             InitializeComponent();
+            ApplyTheme();
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
@@ -27,17 +31,47 @@ namespace ShinonoDNSUnlocker
             UpdateLanguage();
             LoadNetworkAdapters();
 
-            // Chạy Ping ngay lập tức
             await PingDNSAsync();
 
-            // Setup bộ hẹn giờ Ping mỗi 5 giây
             pingTimer = new DispatcherTimer();
             pingTimer.Interval = TimeSpan.FromSeconds(5);
             pingTimer.Tick += async (s, args) => await PingDNSAsync();
             pingTimer.Start();
         }
 
-        #region --- NGÔN NGỮ (LANGUAGE) ---
+        #region --- GIAO DIỆN SÁNG / TỐI ---
+        private void BtnThemeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            isDarkMode = !isDarkMode;
+            ApplyTheme();
+            Log(isVietnamese ? (isDarkMode ? "Đã chuyển sang Giao diện Tối." : "Đã chuyển sang Giao diện Sáng.")
+                             : (isDarkMode ? "Switched to Dark Theme." : "Switched to Light Theme."));
+        }
+
+        private void ApplyTheme()
+        {
+            var paletteHelper = new PaletteHelper();
+            var theme = paletteHelper.GetTheme();
+
+            theme.SetBaseTheme(
+                isDarkMode
+                    ? BaseTheme.Dark
+                    : BaseTheme.Light
+            );
+
+            paletteHelper.SetTheme(theme);
+
+            // txtLog có thể chưa được khởi tạo khi constructor gọi ApplyTheme()
+            if (txtLog != null)
+            {
+                txtLog.Foreground = isDarkMode
+                    ? new SolidColorBrush(Color.FromRgb(74, 246, 38))   // Neon Green
+                    : new SolidColorBrush(Color.FromRgb(0, 100, 0));    // Dark Green
+            }
+        }
+        #endregion
+
+        #region --- NGÔN NGỮ ---
         private void BtnLangVN_Click(object sender, RoutedEventArgs e) { isVietnamese = true; UpdateLanguage(); }
         private void BtnLangEN_Click(object sender, RoutedEventArgs e) { isVietnamese = false; UpdateLanguage(); }
 
@@ -55,13 +89,13 @@ namespace ShinonoDNSUnlocker
             btnApplyHosts.Content = isVietnamese ? "ÁP DỤNG BYPASS" : "APPLY BYPASS";
             btnRemoveHosts.Content = isVietnamese ? "XÓA BYPASS" : "REMOVE BYPASS";
 
-            btnRestore.Content = isVietnamese ? "Khôi phục Mặc định (DHCP)" : "Restore Default (DHCP)";
+            btnRestore.Content = isVietnamese ? "Trả về Auto DHCP" : "Restore to Auto DHCP";
             btnTestSteam.Content = isVietnamese ? "Kiểm tra Kết nối Steam" : "Test Steam Connection";
             Log(isVietnamese ? "Đã đổi ngôn ngữ sang Tiếng Việt." : "Language changed to English.");
         }
         #endregion
 
-        #region --- TÍNH NĂNG MẠNG & PING (Auto 5s) ---
+        #region --- TÍNH NĂNG MẠNG & PING ---
         private void LoadNetworkAdapters()
         {
             cmbAdapters.Items.Clear();
@@ -75,9 +109,19 @@ namespace ShinonoDNSUnlocker
 
         private void BtnRefreshAdapters_Click(object sender, RoutedEventArgs e) => LoadNetworkAdapters();
 
+        // Tự động Ping lại ngay khi người dùng chọn Card mạng khác
+        private async void CmbAdapters_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (cmbAdapters.SelectedItem != null && txtLog != null)
+            {
+                lblPingCF.Text = "Ping: Đang kiểm tra lại...";
+                lblPingGG.Text = "Ping: Đang kiểm tra lại...";
+                await PingDNSAsync();
+            }
+        }
+
         private async Task PingDNSAsync()
         {
-            // Không log ra Console để tránh rác màn hình
             string cfPing = await GetPingResult("1.1.1.1");
             string ggPing = await GetPingResult("8.8.8.8");
 
@@ -185,7 +229,6 @@ namespace ShinonoDNSUnlocker
             RunPowerShell(script, isVietnamese ? "Kích hoạt DNS over HTTPS (DoH) thành công!" : "Enabled DNS over HTTPS (DoH) successfully!");
         }
 
-        // --- BUTTON EVENTS ---
         private void BtnSetCF_Click(object sender, RoutedEventArgs e) => SetDNS("1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001");
 
         private void BtnSetCFDoH_Click(object sender, RoutedEventArgs e)
@@ -202,15 +245,20 @@ namespace ShinonoDNSUnlocker
             EnableDoH("8.8.8.8", "8.8.4.4", "https://dns.google/dns-query");
         }
 
+        // TÍNH NĂNG GỠ CÀI ĐẶT HOÀN TOÀN (CẢ DNS VÀ DOH)
         private void BtnRestore_Click(object sender, RoutedEventArgs e)
         {
             string adapter = GetSelectedAdapter();
             if (adapter == null) return;
+            Log(isVietnamese ? $"Đang gỡ toàn bộ cấu hình mạng cho [{adapter}]..." : $"Resetting network config for [{adapter}]...");
+
+            // Lệnh này vừa đặt IP về DHCP, vừa dùng Reset-DnsClientServerAddress để gỡ triệt để DoH
             string script = $@"
                 netsh interface ipv4 set dnsservers name='{adapter}' source=dhcp;
                 netsh interface ipv6 set dnsservers name='{adapter}' source=dhcp;
+                try {{ Reset-DnsClientServerAddress -InterfaceAlias '{adapter}' -ErrorAction SilentlyContinue }} catch {{}}
             ";
-            RunPowerShell(script, isVietnamese ? "Đã khôi phục DNS về mặc định nhà mạng (DHCP)." : "Restored DNS to default (DHCP).");
+            RunPowerShell(script, isVietnamese ? "Đã trả toàn bộ DNS & DoH về cấu hình Auto Mặc định của nhà mạng." : "Restored DNS & DoH completely to Auto (DHCP).");
         }
         #endregion
 
@@ -229,7 +277,7 @@ namespace ShinonoDNSUnlocker
         {
             try
             {
-                BtnRemoveHosts_Click(null, null); // Clear old first
+                BtnRemoveHosts_Click(null, null);
                 File.AppendAllText(hostsPath, $"\n{bypassMarker}\n{steamHostsData.Trim()}\n{bypassEndMarker}\n");
                 FlushDNS();
                 Log(isVietnamese ? "Đã áp dụng Hosts Bypass thành công! IP Steam đã được lưu cứng." : "Hosts Bypass applied successfully!");
@@ -260,7 +308,7 @@ namespace ShinonoDNSUnlocker
         }
         #endregion
 
-        #region --- NATIVE STEAM CONNECTION TEST (C# HttpClient) ---
+        #region --- NATIVE STEAM CONNECTION TEST ---
         private async void BtnTestSteam_Click(object sender, RoutedEventArgs e)
         {
             btnTestSteam.IsEnabled = false;
@@ -279,22 +327,12 @@ namespace ShinonoDNSUnlocker
             {
                 HttpResponseMessage response = await httpClient.GetAsync(url);
                 if (response.IsSuccessStatusCode)
-                {
                     Log($"[PASS] {name} -> Truy cập THÀNH CÔNG (HTTP {(int)response.StatusCode})");
-                }
                 else
-                {
                     Log($"[WARNING] {name} -> Kết nối được nhưng trả về lỗi: {(int)response.StatusCode}");
-                }
             }
-            catch (HttpRequestException ex)
-            {
-                Log($"[FAIL] {name} -> BỊ CHẶN HOẶC LỖI MẠNG! ({ex.Message})");
-            }
-            catch (TaskCanceledException)
-            {
-                Log($"[FAIL] {name} -> HẾT THỜI GIAN CHỜ (Timeout)! Nhà mạng có thể đang chặn.");
-            }
+            catch (HttpRequestException ex) { Log($"[FAIL] {name} -> BỊ CHẶN HOẶC LỖI MẠNG! ({ex.Message})"); }
+            catch (TaskCanceledException) { Log($"[FAIL] {name} -> HẾT THỜI GIAN CHỜ (Timeout)! Nhà mạng đang chặn."); }
         }
         #endregion
     }
