@@ -16,11 +16,15 @@ namespace ShinonoDNSUnlocker
     {
         private bool isVietnamese = true;
         private bool isDarkMode = true;
+        private string savedAdapter = ""; // Biến lưu tên card mạng lúc tắt
+        private readonly string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SDU_Config.ini");
+
         private DispatcherTimer pingTimer;
         private static readonly HttpClient httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
 
         public MainWindow()
         {
+            LoadSettings(); // Tải cài đặt TRƯỚC KHI load giao diện
             InitializeComponent();
             ApplyTheme();
         }
@@ -39,6 +43,41 @@ namespace ShinonoDNSUnlocker
             pingTimer.Start();
         }
 
+        #region --- LƯU CÀI ĐẶT (SAVE/LOAD SETTINGS) ---
+        private void LoadSettings()
+        {
+            try
+            {
+                if (File.Exists(configPath))
+                {
+                    var lines = File.ReadAllLines(configPath);
+                    foreach (var line in lines)
+                    {
+                        if (line.StartsWith("Language=")) isVietnamese = line.Split('=')[1] == "VN";
+                        if (line.StartsWith("Theme=")) isDarkMode = line.Split('=')[1] == "Dark";
+                        if (line.StartsWith("Adapter=")) savedAdapter = line.Split('=')[1];
+                    }
+                }
+            }
+            catch { /* Bỏ qua nếu lỗi đọc file */ }
+        }
+
+        // Ghi đè sự kiện tắt cửa sổ để lưu file
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            try
+            {
+                string currentAdapter = cmbAdapters.SelectedItem?.ToString() ?? "";
+                string content = $"Language={(isVietnamese ? "VN" : "EN")}\n" +
+                                 $"Theme={(isDarkMode ? "Dark" : "Light")}\n" +
+                                 $"Adapter={currentAdapter}";
+                File.WriteAllText(configPath, content);
+            }
+            catch { }
+            base.OnClosing(e);
+        }
+        #endregion
+
         #region --- GIAO DIỆN SÁNG / TỐI ---
         private void BtnThemeToggle_Click(object sender, RoutedEventArgs e)
         {
@@ -53,20 +92,18 @@ namespace ShinonoDNSUnlocker
             var paletteHelper = new PaletteHelper();
             var theme = paletteHelper.GetTheme();
 
-            theme.SetBaseTheme(
-                isDarkMode
-                    ? BaseTheme.Dark
-                    : BaseTheme.Light
-            );
-
+            theme.SetBaseTheme(isDarkMode ? BaseTheme.Dark : BaseTheme.Light);
             paletteHelper.SetTheme(theme);
 
-            // txtLog có thể chưa được khởi tạo khi constructor gọi ApplyTheme()
+            // FIX LỖI NGƯỢC MÀU: Ép cứng màu nền (Background) và màu chữ (Foreground) của toàn bộ Cửa sổ
+            this.Background = isDarkMode ? new SolidColorBrush(Color.FromRgb(30, 30, 30)) : Brushes.WhiteSmoke;
+            this.Foreground = isDarkMode ? Brushes.White : Brushes.Black;
+
             if (txtLog != null)
             {
                 txtLog.Foreground = isDarkMode
-                    ? new SolidColorBrush(Color.FromRgb(74, 246, 38))   // Neon Green
-                    : new SolidColorBrush(Color.FromRgb(0, 100, 0));    // Dark Green
+                    ? new SolidColorBrush(Color.FromRgb(74, 246, 38))   // Neon Green cho nền tối
+                    : new SolidColorBrush(Color.FromRgb(0, 100, 0));    // Green đậm cho nền sáng
             }
         }
         #endregion
@@ -90,8 +127,8 @@ namespace ShinonoDNSUnlocker
             btnRemoveHosts.Content = isVietnamese ? "XÓA BYPASS" : "REMOVE BYPASS";
 
             btnRestore.Content = isVietnamese ? "Trả về Auto DHCP" : "Restore to Auto DHCP";
-            btnTestSteam.Content = isVietnamese ? "Kiểm tra Kết nối Steam" : "Test Steam Connection";
-            Log(isVietnamese ? "Đã đổi ngôn ngữ sang Tiếng Việt." : "Language changed to English.");
+            btnTestSteam.Content = isVietnamese ? "Ấn vào để kiểm tra kết nối đến Steam" : "Test Steam Connection";
+            Log(isVietnamese ? "Đã đổi sang Tiếng Việt." : "Language changed to English.");
         }
         #endregion
 
@@ -103,13 +140,18 @@ namespace ShinonoDNSUnlocker
                 .Where(n => n.OperationalStatus == OperationalStatus.Up && n.NetworkInterfaceType != NetworkInterfaceType.Loopback);
 
             foreach (var nic in nics) cmbAdapters.Items.Add(nic.Name);
-            if (cmbAdapters.Items.Count > 0) cmbAdapters.SelectedIndex = 0;
+
+            // Tự động chọn lại Card mạng đã lưu từ lần mở trước
+            if (!string.IsNullOrEmpty(savedAdapter) && cmbAdapters.Items.Contains(savedAdapter))
+                cmbAdapters.SelectedItem = savedAdapter;
+            else if (cmbAdapters.Items.Count > 0)
+                cmbAdapters.SelectedIndex = 0;
+
             Log(isVietnamese ? "Đã cập nhật danh sách Card mạng." : "Updated network adapters.");
         }
 
         private void BtnRefreshAdapters_Click(object sender, RoutedEventArgs e) => LoadNetworkAdapters();
 
-        // Tự động Ping lại ngay khi người dùng chọn Card mạng khác
         private async void CmbAdapters_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (cmbAdapters.SelectedItem != null && txtLog != null)
@@ -209,10 +251,11 @@ namespace ShinonoDNSUnlocker
             Log(isVietnamese ? $"Đang áp dụng DNS cho [{adapter}]..." : $"Applying DNS for [{adapter}]...");
 
             string script = $@"
-                netsh interface ipv4 set dnsservers name='{adapter}' source=static address={v4_1} validate=no;
-                netsh interface ipv4 add dnsservers name='{adapter}' address={v4_2} index=2 validate=no;
-                netsh interface ipv6 set dnsservers name='{adapter}' source=static address={v6_1} validate=no;
-                netsh interface ipv6 add dnsservers name='{adapter}' address={v6_2} index=2 validate=no;
+                netsh interface ipv4 set dnsservers name=""{adapter}"" source=static address={v4_1} validate=no;
+                netsh interface ipv4 add dnsservers name=""{adapter}"" address={v4_2} index=2 validate=no;
+                netsh interface ipv6 set dnsservers name=""{adapter}"" source=static address={v6_1} validate=no;
+                netsh interface ipv6 add dnsservers name=""{adapter}"" address={v6_2} index=2 validate=no;
+                exit 0;
             ";
             RunPowerShell(script, isVietnamese ? "Cài đặt DNS thành công!" : "DNS Set Successfully!");
         }
@@ -245,18 +288,19 @@ namespace ShinonoDNSUnlocker
             EnableDoH("8.8.8.8", "8.8.4.4", "https://dns.google/dns-query");
         }
 
-        // TÍNH NĂNG GỠ CÀI ĐẶT HOÀN TOÀN (CẢ DNS VÀ DOH)
+        // TÍNH NĂNG GỠ CÀI ĐẶT (FIX LỖI BÁO ĐỎ)
         private void BtnRestore_Click(object sender, RoutedEventArgs e)
         {
             string adapter = GetSelectedAdapter();
             if (adapter == null) return;
             Log(isVietnamese ? $"Đang gỡ toàn bộ cấu hình mạng cho [{adapter}]..." : $"Resetting network config for [{adapter}]...");
 
-            // Lệnh này vừa đặt IP về DHCP, vừa dùng Reset-DnsClientServerAddress để gỡ triệt để DoH
+            // Bổ sung Out-Null để chặn lỗi hiển thị nếu adapter ĐÃ là DHCP, kèm exit 0 để C# luôn nhận dạng thành công.
             string script = $@"
-                netsh interface ipv4 set dnsservers name='{adapter}' source=dhcp;
-                netsh interface ipv6 set dnsservers name='{adapter}' source=dhcp;
-                try {{ Reset-DnsClientServerAddress -InterfaceAlias '{adapter}' -ErrorAction SilentlyContinue }} catch {{}}
+                netsh interface ipv4 set dnsservers name=""{adapter}"" source=dhcp | Out-Null;
+                netsh interface ipv6 set dnsservers name=""{adapter}"" source=dhcp | Out-Null;
+                try {{ Set-DnsClientServerAddress -InterfaceAlias ""{adapter}"" -ResetServerAddresses -ErrorAction SilentlyContinue }} catch {{}}
+                exit 0;
             ";
             RunPowerShell(script, isVietnamese ? "Đã trả toàn bộ DNS & DoH về cấu hình Auto Mặc định của nhà mạng." : "Restored DNS & DoH completely to Auto (DHCP).");
         }
